@@ -1,0 +1,12 @@
+nohup: ignoring input
+warning: unused import: `Instant`
+ --> src/main.rs:4:27
+  |
+4 | use std::time::{Duration, Instant};
+  |                           ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `oled` (bin "oled") generated 1 warning (run `cargo fix --bin "oled"` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `target/debug/oled`

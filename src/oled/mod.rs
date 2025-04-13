@@ -1,19 +1,22 @@
 #![allow(dead_code)]
 
-use std::string;
-
 use embedded_hal::i2c::I2c;
 use linux_embedded_hal::I2cdev;
 mod font;
-use font::FONT24X24;
+use font::{FONT8X8, FONT24X24, Font};
 
 pub enum OLEDColorMode {
     ColorNormal = 0, // 正常模式 黑底白字
     ColorReserved,   // 反色模式 白底黑字
 }
 
+const HEIGHT: usize = 64; // OLED 高度
+const WIDTH: usize = 128; // OLED 宽度
+const COLUMN_SIZE: usize = 8; // 列大小(单位：bit)
+const PAGE: usize = HEIGHT / COLUMN_SIZE ; // 页数
+
 static mut I2C_ADDR: u8 = 0x3C; // I2C 地址
-static mut FRAME_BUFFER: [[u8; 128]; 8] = [[0; 128]; 8];
+static mut FRAME_BUFFER: [[u8; WIDTH]; PAGE] = [[0; WIDTH]; PAGE];
 
 fn send(i2c: &mut I2cdev, data: u8) {
     unsafe {
@@ -95,58 +98,105 @@ pub fn clear(i2c: &mut I2cdev) {
 
 pub fn newframe() {
     unsafe {
-        FRAME_BUFFER = [[0; 128]; 8];
+        FRAME_BUFFER = [[0; WIDTH];PAGE];
     }
 }
 
 pub fn showframe(i2c: &mut I2cdev) {
     unsafe {
-        for i in 0..8 {
-            sendcmd(i2c, 0xb0 + i);
+        for i in 0..PAGE {
+            sendcmd(i2c, 0xb0 + i as u8);
             sendcmd(i2c, 0x00);
             sendcmd(i2c, 0x10);
-            for j in 0..128 {
+            for j in 0..WIDTH {
                 send(i2c, FRAME_BUFFER[i as usize][j as usize]);
             }
         }
     }
 }
 
-pub fn setpixel(x: usize, y: usize, color: bool) {
+pub fn setpixel(x: u8, y: u8, color: bool) {
+    let page = y / 8;
+    let page_offset = y % 8;
     unsafe {
         if color {
             if x < 128 && y < 64 {
-                FRAME_BUFFER[y / 8][x] |= 0x01 << (y % 8);
+                FRAME_BUFFER[page as usize][x as usize] |= 0x01 << page_offset;
             }
         } else {
             if x < 128 && y < 64 {
-                FRAME_BUFFER[y / 8][x] &= !(0x01 << (y % 8));
+                FRAME_BUFFER[page as usize][x as usize] &= !(0x01 << page_offset);
             }
         }
     }
 }
 
 // todo 将y变成像素点
-pub fn print_char(x: u8, y: u8, ch: char) {
+pub fn print_char(x: u8, y: u8, font: &Font, ch: char)-> Option<u8> { //返回值是字符宽度
+    // let font = match height {
+    //     8 => FONT8X8,
+    //     24 => FONT24X24,
+    //     _ => {
+    //         println!("Unsupported font height");
+    //         FONT8X8
+    //     }
+    // };
+    
+    let page = y / 8;
+    let page_offset = y % 8;
+    let char_bytes: Option<Vec<Vec<u8>>> = font.get_char(ch);
     unsafe {
-        // let len: usize = FONT24X24.get_char_len();
-        let char_bytes: Option<Vec<Vec<u8>>> = FONT24X24.get_char(ch);
-
         if let Some(char_matrix) = char_bytes {
             for (i, row) in char_matrix.iter().enumerate() {
                 for (j, &byte) in row.iter().enumerate() {
-                    if (x as usize + j) < 128 && (y as usize + i) < 64 {
-                        FRAME_BUFFER[(y as usize + i)][x as usize + j] |= byte;
-                    }
+                    // if (x as usize + j) < WIDTH && (page as usize + i) < PAGE {
+                        FRAME_BUFFER[page as usize + i][x as usize + j] |= 
+                            byte << page_offset;
+                    // }
+                    // if (x as usize + j) < WIDTH && (page as usize + i + 1) < PAGE {
+                        FRAME_BUFFER[page as usize + i + 1][x as usize + j] |=
+                            byte >> (COLUMN_SIZE as u8 - page_offset);
+                    // }
                 }
             }
         }
     }
+    font.get_char_width(ch)
 }
 
-pub fn print_string(x: u8, y: u8, string: String) {
-    unimplemented!()
-    // todo!()
+pub fn print_string(x: u8, y: u8, height: u8, str: &str) {
+    // unimplemented!()
+    let font = match height {
+        8 => FONT8X8,
+        24 => FONT24X24,
+        _ => {
+            println!("Unsupported font height");
+            FONT8X8
+        }
+    };
+
+    let mut column = x;
+    let mut row = y;
+    // let mut page = y / 8;
+    // let page_offset = y % 8;
+
+    for ch in str.chars() {
+        match print_char(column, row, &font, ch){
+            Some(w) => {
+                column += w;
+            }
+            None => {
+                println!("Error: Unsupported character :{}", ch);
+                return;
+            }
+        }
+        
+        if column >= WIDTH as u8 {
+            column = 0;
+            row += font.get_font_height();
+        }
+        
+    }
 }
 
 pub fn set_color_mode(i2c: &mut I2cdev, mode: OLEDColorMode) {

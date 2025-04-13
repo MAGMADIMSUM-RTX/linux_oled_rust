@@ -23,11 +23,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if time_str != last_time_str {
             // let start = Instant::now();
 
-            oled::newframe();
-            for (i, ch) in time_str.chars().enumerate() {
-                oled::print_char((i * 12 + 16) as u8, 2, ch);
-            }
+            oled::print_string(0, 0, 24, &time_str);
             oled::showframe(&mut i2c);
+            oled::newframe();
 
             last_time_str = time_str;
         }

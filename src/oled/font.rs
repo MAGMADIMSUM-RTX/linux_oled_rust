@@ -1,3 +1,4 @@
+// use core::panic;
 use std::ptr;
 
 struct ASCIIFont {
@@ -15,16 +16,36 @@ pub struct Font {
 // 24x24
 impl Font {
     pub fn get_char(&self, ch: char) -> Option<Vec<Vec<u8>>> {
-        if ch < ' ' || ch > 'z' {
+        // if !ch.is_ascii() || ch < ' ' || ch > 'z' {
+        //     return None;
+        // }
+        let (char_data, rows, cols) = if ch.is_ascii() && ch < ' ' {
             return None;
-        }
-        let index = (ch as u8 - ' ' as u8) as usize;
-        let len: usize = ((self.ascii.h / 8) * self.ascii.w) as usize;
-        let char_data = &self.ascii.chars[index * len as usize..(index + 1) * len as usize];
-
-        // 确定行数（高度除以8，因为每个字节代表8个垂直像素）
-        let rows = (self.ascii.h / 8) as usize;
-        let cols = self.ascii.w as usize;
+        } else if ch.is_ascii() {
+            let index = (ch as u8 - ' ' as u8) as usize;
+            let len: usize = ((self.ascii.h / 8) * self.ascii.w) as usize;
+            let char_data = &self.ascii.chars[index * len..(index + 1) * len];
+            // 确定行数（高度除以8，因为每个字节代表8个垂直像素）
+            let rows = (self.ascii.h / 8) as usize;
+            let cols = self.ascii.w as usize;
+            (char_data, rows, cols)
+        } else {
+            // 处理非ASCII字符
+            // if let Some(index) = self.chars.iter().position(|&c| c == ch) {
+            //     let len = ((self.h / 8) * self.w) as usize;
+            //     let char_data = self.chars[index * len..(index + 1) * len]
+            //         .iter()
+            //         .map(|&c| c as u8)
+            //         .collect::<Vec<u8>>()
+            //         .as_slice();
+            //     let rows = (self.h / 8) as usize;
+            //     let cols = self.w as usize;
+            //     (char_data, rows, cols)
+            println!("Unsupported character: {}", ch);
+            // } else {
+            return None;
+            // }
+        };
 
         // 创建二维数组
         let mut result: Vec<Vec<u8>> = Vec::with_capacity(rows);
@@ -35,8 +56,25 @@ impl Font {
             }
             result.push(row_data);
         }
-
         Some(result)
+    }
+
+    pub fn get_char_width(&self, ch: char) -> Option<u8> {
+        if ch.is_ascii() {
+            if ch < ' ' {
+                return None;
+            }
+            return Some(self.ascii.w);
+        } else {
+            if self.chars.iter().any(|&c| c == ch) {
+                return Some(self.w);
+            }
+            return None;
+        }
+    }
+
+    pub fn get_font_height(&self) -> u8 {
+        self.h
     }
 }
 
@@ -295,8 +333,8 @@ const ASCII_24X12: [[u8; 36]; 95] = [
     ], /*"6",22*/
     [
         0x00, 0x00, 0xC0, 0xE0, 0x60, 0x60, 0x60, 0x60, 0x60, 0xE0, 0x60, 0x00, 0x00, 0x00, 0x03,
-        0x00, 0x00, 0x00, 0xE0, 0x18, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F,
-        0x1F, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0xE0, 0x18, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ], /*"7",23*/
     [
         0x00, 0x80, 0xC0, 0x60, 0x20, 0x20, 0x20, 0x20, 0x60, 0xC0, 0x80, 0x00, 0x00, 0x87, 0xEF,
@@ -550,8 +588,8 @@ const ASCII_24X12: [[u8; 36]; 95] = [
     ], /*"i",73*/
     [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x04, 0x04, 0x04, 0xFC, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xC0, 0x80, 0x80,
-        0xC0, 0x7F, 0x3F, 0x00, 0x00, 0x00,
+        0x00, 0x04, 0x04, 0x04, 0xFC, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xC0, 0x80,
+        0x80, 0xC0, 0x7F, 0x3F, 0x00, 0x00,
     ], /*"j",74*/
     [
         0x00, 0x20, 0xE0, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
@@ -560,7 +598,7 @@ const ASCII_24X12: [[u8; 36]; 95] = [
     ], /*"k",75*/
     [
         0x00, 0x00, 0x20, 0x20, 0x20, 0xE0, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x1F,
+        0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x1F,
         0x1F, 0x10, 0x10, 0x10, 0x00, 0x00,
     ], /*"l",76*/
     [

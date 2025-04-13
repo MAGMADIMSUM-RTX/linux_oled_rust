@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
-use linux_embedded_hal::I2cdev;
+use std::string;
+
 use embedded_hal::i2c::I2c;
+use linux_embedded_hal::I2cdev;
 mod font;
-use font::ASCII_24X12;
+use font::FONT24X24;
 
 pub enum OLEDColorMode {
     ColorNormal = 0, // 正常模式 黑底白字
@@ -14,14 +16,15 @@ static mut I2C_ADDR: u8 = 0x3C; // I2C 地址
 static mut FRAME_BUFFER: [[u8; 128]; 8] = [[0; 128]; 8];
 
 fn send(i2c: &mut I2cdev, data: u8) {
-
     unsafe {
-    let _ = i2c.write(I2C_ADDR,&[0x40, data]);}
+        let _ = i2c.write(I2C_ADDR, &[0x40, data]);
+    }
 }
 
 fn sendcmd(i2c: &mut I2cdev, cmd: u8) {
     unsafe {
-    let _ = i2c.write(I2C_ADDR,&[0x00, cmd]);}
+        let _ = i2c.write(I2C_ADDR, &[0x00, cmd]);
+    }
 }
 
 pub fn init(i2c: &mut I2cdev) {
@@ -123,15 +126,27 @@ pub fn setpixel(x: usize, y: usize, color: bool) {
     }
 }
 
-pub fn printchar(x: u8, y: u8, ch: char) {
+// todo 将y变成像素点
+pub fn print_char(x: u8, y: u8, ch: char) {
     unsafe {
-        for i in 0..3 {
-            for j in 0..12 {
-                FRAME_BUFFER[(y + i) as usize][(x + j) as usize] |=
-                    ASCII_24X12[(ch as u8 - ' ' as u8) as usize][(i * 12 + j) as usize];
+        // let len: usize = FONT24X24.get_char_len();
+        let char_bytes: Option<Vec<Vec<u8>>> = FONT24X24.get_char(ch);
+
+        if let Some(char_matrix) = char_bytes {
+            for (i, row) in char_matrix.iter().enumerate() {
+                for (j, &byte) in row.iter().enumerate() {
+                    if (x as usize + j) < 128 && (y as usize + i) < 64 {
+                        FRAME_BUFFER[(y as usize + i)][x as usize + j] |= byte;
+                    }
+                }
             }
         }
     }
+}
+
+pub fn print_string(x: u8, y: u8, string: String) {
+    unimplemented!()
+    // todo!()
 }
 
 pub fn set_color_mode(i2c: &mut I2cdev, mode: OLEDColorMode) {
@@ -157,7 +172,5 @@ pub fn set_color_mode(i2c: &mut I2cdev, mode: OLEDColorMode) {
 
 //     temp = data| 0xff<<(end+1)|0xff>>(8-start);
 //     FRAME_BUFFER[page as usize][column as usize] &= temp;
-    
-    
 
 // }

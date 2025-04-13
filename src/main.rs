@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             oled::newframe();
             for (i, ch) in time_str.chars().enumerate() {
-                oled::printchar((i * 12 + 16) as u8, 2, ch);
+                oled::print_char((i * 12 + 16) as u8, 2, ch);
             }
             oled::showframe(&mut i2c);
 

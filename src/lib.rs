@@ -1,7 +1,7 @@
 use embedded_hal::i2c::I2c;
 use linux_embedded_hal::I2cdev;
 mod font;
-use font::{FONT8X8, FONT24X24, Font};
+use font::{FONT8X8,FONT16X16, FONT24X24, Font};
 
 pub enum OLEDColorMode {
     ColorNormal = 0, // 正常模式 黑底白字
@@ -97,14 +97,16 @@ pub fn clear(i2c: &mut I2cdev) {
 pub struct Buffer {
     data: Vec<String>, // 使用String代替&'a str
     len: usize,
+    len_max: usize,
     index: usize,
 }
 
 impl Buffer {
-    pub fn new() -> Self {
+    pub fn new(len_max: usize) -> Self {
         Buffer {
             data: Vec::new(),
             len: 0,
+            len_max: len_max,
             index: 0,
         }
     }
@@ -121,7 +123,12 @@ impl Buffer {
                 // 遇到换行符，在头部添加新行
                 self.data.insert(0, String::new());
                 self.len += 1;
-                self.index = 0;
+                // 保证最大行数
+                if self.len > self.len_max {
+                    self.data.pop();
+                    self.len -= 1;
+                }
+                self.index = 0; // 换行后索引重置
             } else if c == '\r' {
                 // 遇到回车符，将索引重置为0
                 self.index = 0;
@@ -130,14 +137,27 @@ impl Buffer {
                 let current_line = &mut self.data[0];
 
                 // 确保当前行长度足够
-                while current_line.len() <= self.index {
-                    current_line.push(' ');
+                if self.index >= current_line.chars().count() {
+                    // 填充空格直到index
+                    let fill_count = self.index - current_line.chars().count() + 1;
+                    current_line.extend(std::iter::repeat(' ').take(fill_count));
                 }
 
-                // 替换指定位置的字符
-                let mut chars: Vec<char> = current_line.chars().collect();
-                chars[self.index] = c;
-                *current_line = chars.into_iter().collect();
+                // 计算字节索引
+                let char_indices: Vec<usize> =
+                    current_line.char_indices().map(|(i, _)| i).collect();
+                if self.index < char_indices.len() {
+                    let start = char_indices[self.index];
+                    let end = if self.index + 1 < char_indices.len() {
+                        char_indices[self.index + 1]
+                    } else {
+                        current_line.len()
+                    };
+                    current_line.replace_range(start..end, &c.to_string());
+                } else {
+                    // 追加
+                    current_line.push(c);
+                }
 
                 // 索引加1
                 self.index += 1;
@@ -160,10 +180,12 @@ impl Buffer {
     }
 }
 
-pub fn display_buffer(buffer: &Buffer, x: u8, y: u8, height: u8) {
+pub fn display_buffer(buffer: &Buffer, x: u8, y: u8, height: u8, i2c: &mut I2cdev) {
+    newframe();
     for (i, s) in buffer.data.iter().enumerate() {
         print_string(x, y + (i as u8) * height, height, s);
     }
+    showframe(i2c);
 }
 
 pub fn newframe() {
@@ -256,6 +278,7 @@ pub fn print_string(x: u8, y: u8, height: u8, str: &str) {
     // unimplemented!()
     let font = match height {
         8 => FONT8X8,
+        16 => FONT16X16,
         24 => FONT24X24,
         _ => {
             println!("Unsupported font height");
@@ -327,7 +350,7 @@ pub fn set_color_mode(i2c: &mut I2cdev, mode: OLEDColorMode) {
 //         // 只在时间发生变化时才更新显示
 //         if time_str != last_time_str {
 //             oled::print_string( col,row, 24, &time_str);
-            
+
 //             oled::showframe(&mut i2c);
 //             oled::newframe();
 

@@ -1,7 +1,7 @@
 // use core::panic;
 use std::ptr;
 mod font_bytes;
-use font_bytes::{ASCII_8X6, ASCII_24X12, NONE_CHAR};
+use font_bytes::{ASCII_8X6, ASCII_16X8, ASCII_24X12, NONE_CHAR};
 
 struct ASCIIFont {
     h: u8,
@@ -106,6 +106,23 @@ pub const FONT8X8: Font = Font {
     w: 8,
     chars: &NONE_CHAR,
     ascii: AFONT8X6,
+};
+
+const AFONT16X8: ASCIIFont = ASCIIFont {
+    h: 16,
+    w: 8,
+    chars: unsafe {
+        ptr::slice_from_raw_parts(ASCII_16X8.as_ptr() as *const u8, 95 * 16)
+            .as_ref()
+            .unwrap()
+    },
+};
+
+pub const FONT16X16: Font = Font {
+    h: 16,
+    w: 16,
+    chars: &NONE_CHAR,
+    ascii: AFONT16X8,
 };
 
 const AFONT24X12: ASCIIFont = ASCIIFont {

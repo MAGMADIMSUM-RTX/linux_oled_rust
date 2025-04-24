@@ -1,8 +1,9 @@
-// use core::panic;
+#![allow(unused)]
+// #[allow(dead_code)]
+
 use std::ptr;
 mod font_bytes;
 use font_bytes::{ASCII_8X6, ASCII_16X8, ASCII_24X12, NONE_CHAR};
-
 struct ASCIIFont {
     h: u8,
     w: u8,
@@ -16,6 +17,7 @@ pub struct Font {
     ascii: ASCIIFont,
 }
 
+#[allow(dead_code)]
 pub struct Buffer<'a> {
     pub data: Vec<&'a str>,
     pub len: usize,
